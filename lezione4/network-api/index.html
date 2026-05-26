@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Network API Tester</title>
+</head>
+<body class="bg-slate-100 p-8">
+    <div class="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-md">
+        <h1 class="text-2xl font-bold mb-6">Network Device Manager</h1>
+
+        <div id="routerList" class="space-y-4 mb-8">
+            <!-- Routers list -->
+        </div>
+
+        <div class="bg-slate-50 p-4 rounded-lg">
+            <h2 class="font-bold mb-2 text-slate-700">Configurazione Generata:</h2>
+            <pre id="configPreview" class="bg-slate-900 text-green-400 p-4 rounded font-mono text-sm overflow-x-auto min-h-[100px]">Seleziona un router per vedere la config...</pre>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3005';
+
+        async function loadRouters() {
+            const res = await fetch(`${API_URL}/routers`);
+            const routers = await res.json();
+            const list = document.getElementById('routerList');
+
+            list.innerHTML = routers.map(r => `
+                <div class="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-lg hover:border-blue-400 transition">
+                    <div>
+                        <span class="font-bold text-lg">${r.hostname}</span>
+                        <span class="text-slate-400 text-sm ml-2">(ID: ${r.id})</span>
+                        <div class="text-sm text-slate-500">${r.interfaces.length} Interfacce</div>
+                    </div>
+                    <button
+                        onclick="showConfig(${r.id})"
+                        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+                    >Genera Config</button>
+                </div>
+            `).join('');
+        }
+
+        async function showConfig(id) {
+            const res = await fetch(`${API_URL}/routers/${id}/config`);
+            const config = await res.text();
+            document.getElementById('configPreview').textContent = config;
+        }
+
+        loadRouters();
+    </script>
+</body>
+</html>
