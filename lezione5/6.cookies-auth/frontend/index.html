@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cookie Demo - Lezione 5</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
+        .card { border: 1px solid #ddd; padding: 1rem; margin-bottom: 1rem; border-radius: 8px; background: #f9f9f9; }
+        button { background: #26428b; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; }
+        button:hover { background: #1d336e; }
+        pre { background: #eee; padding: 1rem; border-radius: 4px; overflow-x: auto; }
+        .status { font-weight: bold; color: #26428b; }
+    </style>
+</head>
+<body>
+    <h1>Gestione Cookie 🍪</h1>
+    <p>In questa pagina vediamo come il browser gestisce i cookie inviati dal server.</p>
+
+    <div class="card">
+        <h3>1. Imposta Cookie</h3>
+        <button onclick="setCookie('session')">Set Session Cookie</button>
+        <button onclick="setCookie('persistent')">Set Persistent Cookie</button>
+        <button onclick="setCookie('secure')">Set HttpOnly Cookie</button>
+    </div>
+
+    <div class="card">
+        <h3>2. Ispezione Lato Client</h3>
+        <p>Valore di <code>document.cookie</code> (accessibile via JavaScript):</p>
+        <pre id="js-cookies">Caricamento...</pre>
+        <button onclick="refreshJSCookies()">Aggiorna document.cookie</button>
+        <p><small>Nota: I cookie <strong>HttpOnly</strong> non appariranno qui!</small></p>
+    </div>
+
+    <div class="card">
+        <h3>3. Ispezione Lato Server</h3>
+        <p>Chiedi al server quali cookie ha ricevuto dal browser:</p>
+        <button onclick="getServerCookies()">Controlla Server</button>
+        <pre id="server-response">Fai una richiesta per vedere i risultati...</pre>
+    </div>
+
+    <div class="card">
+        <h3>4. Pulizia</h3>
+        <button onclick="clearCookies()" style="background: #c0392b;">Rimuovi tutti i Cookie</button>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3001';
+
+        async function setCookie(type) {
+            let endpoint = '';
+            if (type === 'session') endpoint = '/set-session-cookie';
+            if (type === 'persistent') endpoint = '/set-persistent-cookie';
+            if (type === 'secure') endpoint = '/set-secure-cookie';
+
+            const res = await fetch(`${API_URL}${endpoint}`, { credentials: 'include' });
+            const text = await res.text();
+            alert(text);
+            refreshJSCookies();
+        }
+
+        async function getServerCookies() {
+            const res = await fetch(`${API_URL}/get-cookies`, { credentials: 'include' });
+            const data = await res.json();
+            document.getElementById('server-response').textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function clearCookies() {
+            const res = await fetch(`${API_URL}/clear-cookies`, { credentials: 'include' });
+            const text = await res.text();
+            alert(text);
+            refreshJSCookies();
+            document.getElementById('server-response').textContent = 'Cookie rimossi.';
+        }
+
+        function refreshJSCookies() {
+            const cookies = document.cookie;
+            document.getElementById('js-cookies').textContent = cookies || '(Nessun cookie accessibile)';
+        }
+
+        // Inizializza
+        refreshJSCookies();
+    </script>
+</body>
+</html>
