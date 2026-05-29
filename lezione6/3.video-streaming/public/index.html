@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Video Streaming</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .primary-color { color: rgb(38, 66, 139); }
+        .bg-primary { background-color: rgb(38, 66, 139); }
+        video { transform: scaleX(-1); } /* Mirror effect per il video locale */
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div class="max-w-5xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+        <header class="bg-primary p-6 text-white text-center">
+            <h1 class="text-2xl font-bold">WebRTC Video Loopback</h1>
+            <p class="text-sm opacity-80 mt-1">Acquisizione multimediale e trasmissione P2P locale</p>
+        </header>
+
+        <!-- Signaling Configuration -->
+        <div class="bg-blue-50 p-4 border-b flex flex-wrap items-center justify-center gap-6">
+            <div class="flex items-center gap-3">
+                <label class="text-xs font-bold text-blue-900 uppercase">Modalità:</label>
+                <select id="modeSelect" class="text-sm border rounded p-1 outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="loopback">Local Loopback (Singola Tab)</option>
+                    <option value="remote">Remote LAN (Due PC diversi)</option>
+                </select>
+            </div>
+            <div id="signalingConfig" class="hidden flex items-center gap-3 animate-fade-in">
+                <label class="text-xs font-bold text-blue-900 uppercase">IP Signaling Server:</label>
+                <input type="text" id="signalingIp" placeholder="es: 192.168.1.15" class="text-sm border rounded p-1 w-40 outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="connectSignaling" class="bg-blue-900 text-white px-4 py-1 rounded text-xs font-bold hover:opacity-90">Connetti</button>
+            </div>
+            <div id="signalingStatus" class="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-2">
+                <span id="statusDot" class="w-2 h-2 rounded-full bg-gray-300"></span> Offline
+            </div>
+
+            <!-- Peer Discovery -->
+            <div id="peerDiscovery" class="hidden flex items-center gap-3 border-l pl-6 ml-auto">
+                <span class="text-[10px] font-bold text-blue-900 uppercase">Peer Online:</span>
+                <div id="peerList" class="flex gap-2">
+                    <!-- I bottoni dei peer appariranno qui -->
+                </div>
+            </div>
+        </div>
+
+        <div class="p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Peer A (Locale) -->
+            <div class="space-y-4">
+                <div class="flex items-center justify-between border-b pb-1">
+                    <h2 class="text-sm font-semibold primary-color uppercase tracking-wider">Peer A (Locale)</h2>
+                    <span id="statusLocal" class="text-[10px] bg-gray-200 px-2 py-0.5 rounded text-gray-600 font-bold uppercase">Off</span>
+                </div>
+                
+                <!-- Video Container A -->
+                <div class="aspect-video bg-black rounded-lg overflow-hidden shadow-inner flex items-center justify-center relative border-2 border-transparent" id="localVideoContainer">
+                    <video id="localVideo" autoplay playsinline muted class="w-full h-full object-cover bg-black"></video>
+                    <div id="localPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-gray-600 gap-2 bg-gray-900">
+                        <svg class="w-12 h-12 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                        <span class="text-[10px] font-mono uppercase tracking-widest opacity-50">Local Feed</span>
+                    </div>
+                    <!-- Controls Overlay -->
+                    <div id="mediaControls" class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-3 hidden">
+                        <button id="toggleMic" class="p-3 rounded-full bg-white/20 hover:bg-white/40 text-white backdrop-blur-sm transition border border-white/10" title="Mute/Unmute Mic">
+                            <span id="micIconContainer">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+                            </span>
+                        </button>
+                        <button id="toggleCam" class="p-3 rounded-full bg-white/20 hover:bg-white/40 text-white backdrop-blur-sm transition border border-white/10" title="On/Off Camera">
+                            <span id="camIconContainer">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Chat A -->
+                <div class="space-y-2">
+                    <div id="chatMessagesA" class="h-40 bg-gray-50 border rounded-lg p-3 overflow-y-auto text-xs space-y-2 flex flex-col shadow-inner">
+                        <p class="text-gray-400 italic text-center opacity-50 mt-10">Chat A</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="text" id="chatInputA" placeholder="Scrivi a Peer B..." class="flex-1 border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:opacity-50" disabled>
+                        <button id="chatSendA" class="bg-primary text-white px-4 py-2 rounded-lg hover:opacity-90 transition disabled:opacity-50" disabled>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Peer B (Remoto) -->
+            <div class="space-y-4">
+                <div class="flex items-center justify-between border-b pb-1">
+                    <h2 class="text-sm font-semibold primary-color uppercase tracking-wider">Peer B (Remoto)</h2>
+                    <span id="statusRemote" class="text-[10px] bg-gray-200 px-2 py-0.5 rounded text-gray-600 font-bold uppercase">Disconnected</span>
+                </div>
+                
+                <!-- Video Container B -->
+                <div class="aspect-video bg-black rounded-lg overflow-hidden shadow-inner flex items-center justify-center relative border-2 border-transparent" id="remoteVideoContainer">
+                    <video id="remoteVideo" autoplay playsinline class="w-full h-full object-cover bg-black"></video>
+                    <div id="remotePlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-gray-600 gap-2 bg-gray-900">
+                        <svg class="w-12 h-12 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+                        <span class="text-[10px] font-mono uppercase tracking-widest opacity-50">Remote Feed</span>
+                    </div>
+                </div>
+
+                <!-- Chat B -->
+                <div class="space-y-2">
+                    <div id="chatMessagesB" class="h-40 bg-gray-50 border rounded-lg p-3 overflow-y-auto text-xs space-y-2 flex flex-col shadow-inner">
+                        <p class="text-gray-400 italic text-center opacity-50 mt-10">Chat B</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="text" id="chatInputB" placeholder="Scrivi a Peer A..." class="flex-1 border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:opacity-50" disabled>
+                        <button id="chatSendB" class="bg-primary text-white px-4 py-2 rounded-lg hover:opacity-90 transition disabled:opacity-50" disabled>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Global Controls -->
+        <div class="bg-gray-50 p-6 border-t flex flex-col items-center gap-4">
+            <div class="flex gap-4">
+                <button id="cameraBtn" class="bg-blue-600 text-white px-8 py-3 rounded-full font-bold shadow-md hover:bg-blue-700 transition flex items-center gap-2">
+                    1. Attiva Media Locale
+                </button>
+                <button id="callBtn" class="bg-green-600 text-white px-8 py-3 rounded-full font-bold shadow-md hover:bg-green-700 transition flex items-center gap-2 disabled:opacity-50" disabled>
+                    2. Avvia Handshake P2P
+                </button>
+                <button id="hangupBtn" class="bg-red-600 text-white px-8 py-3 rounded-full font-bold shadow-md hover:bg-red-700 transition disabled:opacity-50" disabled>
+                    Termina Sessione
+                </button>
+            </div>
+            <div id="logArea" class="w-full max-w-4xl bg-black rounded-lg p-3 font-mono text-[9px] text-green-400 h-20 overflow-y-auto border-t-4 border-green-900/50">
+                > Sistema pronto. Inizializzare i media locali per procedere.
+            </div>
+        </div>
+    </div>
+
+    <!-- Ringing Modal -->
+    <div id="ringModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full text-center space-y-6 animate-bounce-slow">
+            <div class="relative inline-block">
+                <div class="absolute inset-0 rounded-full bg-blue-500 animate-ping opacity-20"></div>
+                <div class="bg-blue-600 text-white p-6 rounded-full relative">
+                    <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                </div>
+            </div>
+            <div>
+                <h3 class="text-xl font-bold text-gray-900">Videochiamata in arrivo</h3>
+                <p id="callerIp" class="text-sm text-gray-500 font-mono mt-1">da: 192.168.1.15</p>
+            </div>
+            <div class="flex gap-4">
+                <button id="declineBtn" class="flex-1 bg-red-100 text-red-600 py-3 rounded-xl font-bold hover:bg-red-200 transition">Rifiuta</button>
+                <button id="acceptBtn" class="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition">Rispondi</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        @keyframes bounce-slow {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .animate-bounce-slow { animation: bounce-slow 2s infinite ease-in-out; }
+    </style>
+
+    <script src="script.js"></script>
+</body>
+</html>
